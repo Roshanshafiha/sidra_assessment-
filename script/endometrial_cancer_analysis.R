@@ -2,8 +2,8 @@ library('DESeq2')
 library(FactoMineR)
 library(tidyverse)
 library( AnnotationDbi )
-
 library("org.Hs.eg.db")
+library(multiMiR)
 
 
 setwd("C:/Users/shafi_l1kxhwi/Desktop/sidra_assessment-/")
@@ -134,14 +134,76 @@ res_list <- list()
 # Loop through each category and perform the DESeq2 results function
 for (stage in stages) {
   if (stage != "Normal") { # Skip the 'healthy' category as we compare others against it
-    res <- results(dds_deseq, contrast = c("group", stage, "Normal"))
+    res <- as.data.frame(results(dds_deseq, contrast = c("group", stage, "Normal")))
+    res <- subset(res, padj <= 0.05)
+    res <- res %>%
+      filter(log2FoldChange >= 2 | log2FoldChange <= -2)
     res_list[[stage]] <- res
   }
 }
 
 
-anno <- AnnotationDbi::select(org.Hs.eg.db, rownames(res_list[["StageI"]]),columns=c("ENSEMBL", "ENTREZID", "SYMBOL", "GENENAME"), keytype="PROBEID")
+#get annotation for the mirna for each disease stages
+
+mirna_anno_results <- list()
+
+for (disease_stage in names(res_list)) {
+  # Extract the miRNA IDs (rownames)
+  mirna_ids <- rownames(res_list[[disease_stage]])
+  
+  # Perform get_multimir function for each miRNA ID
+  mirna_targets <- get_multimir(mirna = mirna_ids, table = "predicted", summary = TRUE, predicted.cutoff = 35,
+                                predicted.cutoff.type = "p")
+  mirna_targets <- mirna_targets@data %>%
+    filter(score == 1) %>%      # Keep only rows with score of 1
+    distinct(target_symbol, .keep_all = TRUE)
+  
+  # Store the results in a separate list
+  mirna_anno_results[[disease_stage]] <- mirna_targets
+}
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+mirna_list <- c("hsa-let-7a-5p", "hsa-miR-21-5p")
+
+# Retrieve predicted targets
+mirna_targets <- get_multimir(mirna = mirna_list, table = "predicted", summary = TRUE, predicted.cutoff = 35,
+                              predicted.cutoff.type = "p")
+filtered_df <- mirna_targets@data %>%
+  filter(score == 1) %>%      # Keep only rows with score of 1
+  distinct(target_symbol, .keep_all = TRUE)
+
+a<-as.data.frame(mirna_targets@predicted.cutoff)
+target_genes <- unique(mirna_targets@data$target_symbol)
+
+example4.counts <- addmargins(table(mirna_targets@summary[, 2:3]))
+example4.counts <- example4.counts[-nrow(example4.counts), ]
+example4.counts <- as.data.frame(example4.counts[order(example4.counts[, 5], decreasing = TRUE), ])
 
 
