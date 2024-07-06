@@ -1,6 +1,9 @@
 library('DESeq2')
 library(FactoMineR)
 library(tidyverse)
+library( AnnotationDbi )
+
+library("org.Hs.eg.db")
 
 
 setwd("C:/Users/shafi_l1kxhwi/Desktop/sidra_assessment-/")
@@ -119,10 +122,25 @@ p
 #Input data for DEseq2 consists of non-normalized sequence read counts , perform DESeq2 without 
 #data normalisation
 
+#perform deseq
+dds$group <- relevel(dds$group, ref = "Normal")
+dds_deseq <- DESeq(dds)
+
+stages<-stages_of_cancer$stage_cancer
+
+# Initialize an empty list to store results
+res_list <- list()
+
+# Loop through each category and perform the DESeq2 results function
+for (stage in stages) {
+  if (stage != "Normal") { # Skip the 'healthy' category as we compare others against it
+    res <- results(dds_deseq, contrast = c("group", stage, "Normal"))
+    res_list[[stage]] <- res
+  }
+}
 
 
-
-
+anno <- AnnotationDbi::select(org.Hs.eg.db, rownames(res_list[["StageI"]]),columns=c("ENSEMBL", "ENTREZID", "SYMBOL", "GENENAME"), keytype="PROBEID")
 
 
 
