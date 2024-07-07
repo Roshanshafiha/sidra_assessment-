@@ -135,7 +135,7 @@ res_list <- list()
 for (stage in stages) {
   if (stage != "Normal") { # Skip the 'healthy' category as we compare others against it
     res <- as.data.frame(results(dds_deseq, contrast = c("group", stage, "Normal")))
-    res <- subset(res, padj <= 0.05)
+    res <- subset(res, padj <= 0.001)
     res <- res %>%
       filter(log2FoldChange >= 2 | log2FoldChange <= -2)
     res_list[[stage]] <- res
@@ -152,14 +152,67 @@ for (disease_stage in names(res_list)) {
   mirna_ids <- rownames(res_list[[disease_stage]])
   
   # Perform get_multimir function for each miRNA ID
-  mirna_targets <- get_multimir(mirna = mirna_ids, table = "predicted", summary = TRUE, predicted.cutoff = 35,
-                                predicted.cutoff.type = "p")
-  mirna_targets <- mirna_targets@data %>%
-    filter(score == 1) %>%      # Keep only rows with score of 1
+  #mirna_targets <- get_multimir(mirna = mirna_ids, table = "targetscan",predicted.cutoff= 10000,predicted.cutoff.type = 'n' ,predicted.site = 'conserved')
+  mirna_targets <- get_multimir(mirna = mirna_ids, table = "tarbase")
+  mirna_targets <- mirna_targets@data %>%   # Keep only rows with score of 1
     distinct(target_symbol, .keep_all = TRUE)
   
   # Store the results in a separate list
   mirna_anno_results[[disease_stage]] <- mirna_targets
+}
+
+
+#enriichment analysis
+
+library(clusterProfiler)
+
+#GO analysis
+
+GO_enrichment <- list()
+
+for (disease_stage in names(res_list)) {
+  # Extract the miRNA IDs (rownames)
+  entrez_ids <- mirna_anno_results[[disease_stage]]$target_entrez
+  go<-enrichGO(
+    entrez_ids,
+    OrgDb = org.Hs.eg.db,
+    keyType = "ENTREZID",
+    ont = "BP",
+    pvalueCutoff = 0.05,
+    pAdjustMethod = "BH",
+    qvalueCutoff = 0.2,
+    minGSSize = 10,
+    maxGSSize = 500,
+    readable = FALSE,
+    pool = FALSE
+  )
+  #store result
+  GO_enrichment[[disease_stage]] <- go@result
+}
+
+
+#kegg enrichment 
+
+
+KEGG_enrichment <- list()
+
+for (disease_stage in names(res_list)) {
+  # Extract the miRNA IDs (rownames)
+  entrez_ids <- mirna_anno_results[[disease_stage]]$target_entrez
+  KEGG<-enrichKEGG(
+    entrez_ids,
+    organism = 'hsa',
+    keyType = "kegg",
+    minGSSize = 10,
+    maxGSSize = 500,
+    pvalueCutoff = 0.05,
+    pAdjustMethod = "BH",
+    qvalueCutoff = 0.2,
+    use_internal_data = FALSE
+  )
+  
+  #store result
+  KEGG_enrichment[[disease_stage]] <- KEGG@result
 }
 
 
@@ -182,6 +235,49 @@ for (disease_stage in names(res_list)) {
 
 
 
+# Initialize a list to store the KEGG input results
+kegg_input <- list()
+
+# Loop through each disease stage
+for (stage in names(res_list)) {
+  # Extract DESeq2 results and filter columns
+  filtered_res <- res_list[[stage]][, c("log2FoldChange", "padj")]
+  
+  # Match the rownames (miRNAs) in DESeq2 results with miRNAs in annotation data and extract the matched 'entrezid'
+  matched_anno <- mirna_anno_results[[stage]][mirna_anno_results[[stage]]$mature_mirna_id %in% rownames(filtered_res), c("mature_mirna_id", "target_entrez")]
+  
+  # Merge the filtered DESeq2 results with the matched annotation data
+  merged_res <- merge(matched_anno, filtered_res, by.x = "mature_mirna_id", by.y = "row.names")
+  
+  # Sort by log2FoldChange in decreasing order
+  sorted_res <- merged_res[order(-merged_res$log2FoldChange), ]
+  
+  #keep only certain column
+  sorted_res = subset(sorted_res, select = c('target_entrez', 'log2FoldChange'))
+  
+  names(sorted_res) <- c('ID','FC')
+
+  
+  # Store in KEGG input list
+  kegg_input[[stage]] <- sorted_res
+}
+
+
+genesTables <- kegg_input[["StageI"]] %>% 
+  mutate(rank = rank(kegg_input[["StageI"]]$FC,  ties.method = "random")) %>% arrange(desc(rank))
+
+genesTables = subset(genesTables, select = c('ID', 'rank'))
+
+
+
+kk2 <- gseKEGG(geneList     = genesTables,
+               organism     = 'hsa',
+               nPerm        = 100,
+               minGSSize    = 10,
+               maxGSSize    = 500,
+               pvalueCutoff = 0.05,
+               pAdjustMethod = "BH",
+               keyType       = "ncbi-geneid")
 
 
 
@@ -190,20 +286,22 @@ for (disease_stage in names(res_list)) {
 
 
 
-mirna_list <- c("hsa-let-7a-5p", "hsa-miR-21-5p")
 
-# Retrieve predicted targets
-mirna_targets <- get_multimir(mirna = mirna_list, table = "predicted", summary = TRUE, predicted.cutoff = 35,
-                              predicted.cutoff.type = "p")
-filtered_df <- mirna_targets@data %>%
-  filter(score == 1) %>%      # Keep only rows with score of 1
-  distinct(target_symbol, .keep_all = TRUE)
 
-a<-as.data.frame(mirna_targets@predicted.cutoff)
-target_genes <- unique(mirna_targets@data$target_symbol)
 
-example4.counts <- addmargins(table(mirna_targets@summary[, 2:3]))
-example4.counts <- example4.counts[-nrow(example4.counts), ]
-example4.counts <- as.data.frame(example4.counts[order(example4.counts[, 5], decreasing = TRUE), ])
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
