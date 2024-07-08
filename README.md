@@ -17,6 +17,6 @@ This folder consist of the script endometrial_cancer_analysis.R that performs th
 ## Results
 This folder consist of the results which is obtained from the analysis performed by the script in the previous section. It consist of the PCA_plot and a table with stages of cancer and the number of samples in each stage.<br /> 
 
-volcanoplots: This folder consist of the volcano plots which is created to visualize the DE analysis of the miRNA data for different cancer stages.<br /> 
-go_enrichment: This folder consist of the GO enrichment results of the miRNA data after identifying the gene target for significant miRNA identified in the DE analysis stage.<br /> 
-kegg_enrichment: This folder consist of the KEGG enrichment results of the miRNA data after identifying the gene target for significant miRNA identified in the DE analysis stage.<br /> 
+1.volcanoplots: This folder consist of the volcano plots which is created to visualize the DE analysis of the miRNA data for different cancer stages.<br /> 
+2.go_enrichment: This folder consist of the GO enrichment results of the miRNA data after identifying the gene target for significant miRNA identified in the DE analysis stage.<br /> 
+3.kegg_enrichment: This folder consist of the KEGG enrichment results of the miRNA data after identifying the gene target for significant miRNA identified in the DE analysis stage.<br /> 
